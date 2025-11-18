@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Signaling Test Client</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .container {
+      margin-bottom: 20px;
+    }
+
+    video {
+      width: 400px;
+      height: 300px;
+      background: #000;
+      margin: 10px;
+      border: 2px solid #333;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .videos {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      background: #f0f0f0;
+      border-radius: 5px;
+    }
+
+    input {
+      padding: 8px;
+      margin: 5px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebRTC Signaling Test Client</h1>
+
+  <div class="container">
+    <h2>接続設定</h2>
+    <label>
+      Room ID: <input type="text" id="roomId" value="test-room" />
+    </label>
+    <button id="joinBtn">ルームに参加</button>
+    <button id="leaveBtn" disabled>退出</button>
+  </div>
+
+  <div class="status" id="status">未接続</div>
+
+  <div class="container">
+    <h2>ビデオ</h2>
+    <div class="videos">
+      <div>
+        <h3>自分</h3>
+        <video id="localVideo" autoplay muted playsinline></video>
+      </div>
+      <div id="remoteVideos"></div>
+    </div>
+  </div>
+
+  <script>
+    const WS_URL = 'ws://localhost:5000/connect';
+
+    let ws = null;
+    let localStream = null;
+    let clientId = null;
+    let peerConnections = new Map();
+
+    const joinBtn = document.getElementById('joinBtn');
+    const leaveBtn = document.getElementById('leaveBtn');
+    const roomIdInput = document.getElementById('roomId');
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideos = document.getElementById('remoteVideos');
+    const statusDiv = document.getElementById('status');
+
+    const rtcConfig = {
+      iceServers: [
+        // STUNサーバー（NAT越えのためのパブリックIPアドレス検出）
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // TURNサーバー（厳しいファイアウォール環境用）
+        // OpenRelayの無料パブリックTURNサーバー
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ],
+      // ICE候補の収集戦略（all = すべての候補を収集）
+      iceTransportPolicy: 'all',
+      // バンドルポリシー（max-bundle = 帯域幅を最適化）
+      bundlePolicy: 'max-bundle',
+      // RTCP多重化（必須 = 接続を効率化）
+      rtcpMuxPolicy: 'require'
+    };
+
+    function updateStatus(message) {
+      statusDiv.textContent = message;
+      console.log(message);
+    }
+
+    async function getLocalStream() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 },
+          audio: true
+        });
+        localVideo.srcObject = localStream;
+        updateStatus('カメラとマイクを取得しました');
+      } catch (error) {
+        updateStatus('メディアデバイスの取得に失敗: ' + error.message);
+        throw error;
+      }
+    }
+
+    function createPeerConnection(targetClientId) {
+      const pc = new RTCPeerConnection(rtcConfig);
+
+      // ローカルストリームのトラックを追加
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+      });
+
+      // リモートストリームを受信
+      pc.ontrack = (event) => {
+        updateStatus(`${targetClientId} からストリームを受信`);
+        addRemoteVideo(targetClientId, event.streams[0]);
+      };
+
+      // ICE候補の収集完了時
+      pc.onicecandidate = (event) => {
+        if (!event.candidate) {
+          console.log('ICE gathering complete for', targetClientId);
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        updateStatus(`${targetClientId} の接続状態: ${pc.connectionState}`);
+      };
+
+      peerConnections.set(targetClientId, pc);
+      return pc;
+    }
+
+    function addRemoteVideo(clientId, stream) {
+      let videoContainer = document.getElementById('video-' + clientId);
+      if (!videoContainer) {
+        videoContainer = document.createElement('div');
+        videoContainer.id = 'video-' + clientId;
+        videoContainer.innerHTML = `
+                    <h3>Peer: ${clientId.substring(0, 8)}</h3>
+                    <video id="remote-${clientId}" autoplay playsinline></video>
+                `;
+        remoteVideos.appendChild(videoContainer);
+      }
+      const video = document.getElementById('remote-' + clientId);
+      video.srcObject = stream;
+    }
+
+    function removeRemoteVideo(clientId) {
+      const videoContainer = document.getElementById('video-' + clientId);
+      if (videoContainer) {
+        videoContainer.remove();
+      }
+    }
+
+    async function handleNewClient(newClientId) {
+      updateStatus(`新しいクライアントが参加: ${newClientId}`);
+      console.log('[handleNewClient] Starting for client:', newClientId);
+
+      const pc = createPeerConnection(newClientId);
+
+      // Offerを作成
+      console.log('[handleNewClient] Creating offer...');
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      console.log('[handleNewClient] Offer created');
+
+      // ICE候補の収集を待たずにすぐ送信（Trickle ICE）
+      // これにより接続確立が高速化されます
+      console.log('[handleNewClient] Sending offer immediately to:', newClientId);
+      sendMessage({
+        type: 'offer',
+        payload: {
+          sdp: pc.localDescription.sdp,
+          client_id: newClientId
+        }
+      });
+      console.log('[handleNewClient] Offer sent');
+    }
+
+    async function handleOffer(senderId, sdp) {
+      updateStatus(`${senderId} からOfferを受信`);
+      console.log('[handleOffer] Received offer from:', senderId);
+      console.log('[handleOffer] SDP:', sdp.substring(0, 100) + '...');
+
+      const pc = createPeerConnection(senderId);
+
+      console.log('[handleOffer] Setting remote description...');
+      await pc.setRemoteDescription({
+        type: 'offer',
+        sdp: sdp
+      });
+
+      console.log('[handleOffer] Creating answer...');
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      console.log('[handleOffer] Answer created');
+
+      // ICE候補の収集を待たずにすぐ送信（Trickle ICE）
+      console.log('[handleOffer] Sending answer immediately to:', senderId);
+      sendMessage({
+        type: 'answer',
+        payload: {
+          sdp: pc.localDescription.sdp,
+          client_id: senderId
+        }
+      });
+      console.log('[handleOffer] Answer sent');
+    }
+
+    async function handleAnswer(senderId, sdp) {
+      updateStatus(`${senderId} からAnswerを受信`);
+      console.log('[handleAnswer] Received answer from:', senderId);
+      console.log('[handleAnswer] SDP:', sdp.substring(0, 100) + '...');
+
+      const pc = peerConnections.get(senderId);
+      if (pc) {
+        console.log('[handleAnswer] Setting remote description...');
+        await pc.setRemoteDescription({
+          type: 'answer',
+          sdp: sdp
+        });
+        console.log('[handleAnswer] Remote description set, connection should establish');
+      } else {
+        console.error('[handleAnswer] Peer connection not found for:', senderId);
+      }
+    }
+
+    function handleLeaveClient(leavingClientId) {
+      updateStatus(`${leavingClientId} が退出しました`);
+
+      const pc = peerConnections.get(leavingClientId);
+      if (pc) {
+        pc.close();
+        peerConnections.delete(leavingClientId);
+      }
+      removeRemoteVideo(leavingClientId);
+    }
+
+    function sendMessage(message) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log('[sendMessage] Sending:', message.type, message);
+        ws.send(JSON.stringify(message));
+      } else {
+        console.error('[sendMessage] WebSocket not ready, state:', ws?.readyState);
+      }
+    }
+
+    async function joinRoom() {
+      try {
+        await getLocalStream();
+
+        ws = new WebSocket(WS_URL);
+
+        ws.onopen = () => {
+          updateStatus('WebSocket接続成功');
+        };
+
+        ws.onmessage = async (event) => {
+          const message = JSON.parse(event.data);
+          console.log('Received:', message);
+
+          switch (message.type) {
+            case 'notify-client-id':
+              // payloadは既にオブジェクトの場合と文字列の場合があるので確認
+              const payload = typeof message.payload === 'string'
+                ? JSON.parse(message.payload)
+                : message.payload;
+              clientId = payload.client_id;
+              updateStatus(`クライアントID: ${clientId}`);
+
+              // ルームに参加
+              sendMessage({
+                type: 'join',
+                payload: { room_id: roomIdInput.value }
+              });
+              break;
+
+            case 'new-client':
+              const newClientPayload = typeof message.payload === 'string'
+                ? JSON.parse(message.payload)
+                : message.payload;
+              await handleNewClient(newClientPayload.client_id);
+              break;
+
+            case 'offer':
+              const offerPayload = typeof message.payload === 'string'
+                ? JSON.parse(message.payload)
+                : message.payload;
+              await handleOffer(offerPayload.client_id, offerPayload.sdp);
+              break;
+
+            case 'answer':
+              const answerPayload = typeof message.payload === 'string'
+                ? JSON.parse(message.payload)
+                : message.payload;
+              await handleAnswer(answerPayload.client_id, answerPayload.sdp);
+              break;
+
+            case 'leave-client':
+              const leavePayload = typeof message.payload === 'string'
+                ? JSON.parse(message.payload)
+                : message.payload;
+              handleLeaveClient(leavePayload.client_id);
+              break;
+
+            case 'ping':
+              // Ping応答は不要
+              break;
+
+            default:
+              console.log('Unknown message type:', message.type);
+          }
+        };
+
+        ws.onerror = (error) => {
+          updateStatus('WebSocketエラー: ' + error);
+        };
+
+        ws.onclose = () => {
+          updateStatus('WebSocket接続が切断されました');
+          joinBtn.disabled = false;
+          leaveBtn.disabled = true;
+        };
+
+        joinBtn.disabled = true;
+        leaveBtn.disabled = false;
+
+      } catch (error) {
+        updateStatus('エラー: ' + error.message);
+        console.error(error);
+      }
+    }
+
+    function leaveRoom() {
+      if (ws) {
+        ws.close();
+      }
+
+      peerConnections.forEach(pc => pc.close());
+      peerConnections.clear();
+
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+
+      localVideo.srcObject = null;
+      remoteVideos.innerHTML = '';
+
+      updateStatus('退出しました');
+      joinBtn.disabled = false;
+      leaveBtn.disabled = true;
+    }
+
+    joinBtn.addEventListener('click', joinRoom);
+    leaveBtn.addEventListener('click', leaveRoom);
+  </script>
+</body>
+</html>
