@@ -111,22 +111,24 @@ func (h *Handler) HandleReceiveMessage(c *model.Client, conn *websocket.Conn) {
 			continue
 		}
 
-		var resp *model.Message
-		switch req.Type {
-		case "join":
-			resp = h.handleJoinRoom(c, req.Payload)
-		case "offer":
-			resp = h.handleSDPOffer(c, req.Payload)
-		case "answer":
-			resp = h.handleSDPAnswer(c, req.Payload)
-		default:
-			log.Printf("Unknown message type: %s", req.Type)
-		}
+	var resp *model.Message
+	switch req.Type {
+	case "join":
+		resp = h.handleJoinRoom(c, req.Payload)
+	case "offer":
+		resp = h.handleSDPOffer(c, req.Payload)
+	case "answer":
+		resp = h.handleSDPAnswer(c, req.Payload)
+	case "ice-candidate":
+		resp = h.handleIceCandidate(c, req.Payload)
+	default:
+		log.Printf("Unknown message type: %s", req.Type)
+	}
 
-		if resp != nil {
-			respBytes, _ := json.Marshal(resp)
-			sendMessage(conn, respBytes)
-		}
+	if resp != nil {
+		respBytes, _ := json.Marshal(resp)
+		sendMessage(conn, respBytes)
+	}
 	}
 }
 
@@ -220,6 +222,42 @@ func (h *Handler) handleSDPAnswer(c *model.Client, payload json.RawMessage) *mod
 		return &model.Message{
 			Type:    model.MessageTypeError,
 			Payload: []byte(`{"error":"failed to transfer answer"}`),
+		}
+	}
+
+	return nil
+}
+
+// IceCandidatePayload represents the payload for an ICE candidate
+type IceCandidatePayload struct {
+	Candidate     string  `json:"candidate"`
+	SdpMid        *string `json:"sdpMid,omitempty"`
+	SdpMLineIndex *uint16 `json:"sdpMLineIndex,omitempty"`
+	ClientID      string  `json:"client_id"`
+}
+
+func (h *Handler) handleIceCandidate(c *model.Client, payload json.RawMessage) *model.Message {
+	var iceCandidatePayload IceCandidatePayload
+	if err := json.Unmarshal(payload, &iceCandidatePayload); err != nil {
+		log.Printf("Failed to unmarshal ICE candidate payload: %v", err)
+		return &model.Message{
+			Type:    model.MessageTypeError,
+			Payload: []byte(`{"error":"invalid payload"}`),
+		}
+	}
+
+	iceCandidate := &model.IceCandidate{
+		Candidate:     iceCandidatePayload.Candidate,
+		SdpMid:        iceCandidatePayload.SdpMid,
+		SdpMLineIndex: iceCandidatePayload.SdpMLineIndex,
+		ClientID:      c.ID,
+	}
+
+	if err := h.manager.TransferIceCandidate(c, iceCandidate, iceCandidatePayload.ClientID); err != nil {
+		log.Printf("Failed to transfer ICE candidate: %v", err)
+		return &model.Message{
+			Type:    model.MessageTypeError,
+			Payload: []byte(`{"error":"failed to transfer ice candidate"}`),
 		}
 	}
 

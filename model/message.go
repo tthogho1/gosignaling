@@ -11,6 +11,7 @@ const (
 	MessageTypeLeaveClient    MessageType = "leave-client"
 	MessageTypeSDPOffer       MessageType = "offer"
 	MessageTypeSDPAnswer      MessageType = "answer"
+	MessageTypeIceCandidate   MessageType = "ice-candidate"
 	MessageTypeError          MessageType = "error"
 )
 
@@ -24,4 +25,12 @@ type Message struct {
 type SDP struct {
 	Type string `json:"type"`
 	SDP  string `json:"sdp"`
+}
+
+// IceCandidate represents WebRTC ICE candidate data
+type IceCandidate struct {
+	Candidate      string  `json:"candidate"`
+	SdpMid         *string `json:"sdpMid,omitempty"`
+	SdpMLineIndex  *uint16 `json:"sdpMLineIndex,omitempty"`
+	ClientID       string  `json:"client_id"`
 }
