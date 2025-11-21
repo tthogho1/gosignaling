@@ -349,6 +349,11 @@
           addRemoteVideo(clientId, stream);
         });
 
+        wasmClient.setOnIceCandidate((candidateMessage) => {
+          console.log('[WASM] Sending ICE candidate via WebSocket');
+          ws.send(candidateMessage);
+        });
+
         // Get local stream
         console.log('[WASM] Getting local stream...');
         localStream = await wasmClient.getLocalStream();
@@ -437,6 +442,25 @@
                 }
               } else {
                 await handleAnswer(answerPayload.client_id, answerPayload.sdp);
+              }
+              break;
+
+            case 'ice-candidate':
+              const iceCandidatePayload = typeof message.payload === 'string'
+                ? JSON.parse(message.payload)
+                : message.payload;
+              console.log('[WASM] Handling ICE candidate from:', iceCandidatePayload.client_id);
+              if (wasmClient) {
+                try {
+                  await wasmClient.handleIceCandidate(
+                    iceCandidatePayload.client_id,
+                    iceCandidatePayload.candidate,
+                    iceCandidatePayload.sdpMid || null,
+                    iceCandidatePayload.sdpMLineIndex !== undefined ? iceCandidatePayload.sdpMLineIndex : null
+                  );
+                } catch (error) {
+                  console.error('[WASM] Error handling ICE candidate:', error);
+                }
               }
               break;
 

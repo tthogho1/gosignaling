@@ -33,12 +33,23 @@ struct SdpPayload {
     client_id: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct IceCandidatePayload {
+    candidate: String,
+    #[serde(rename = "sdpMid")]
+    sdp_mid: Option<String>,
+    #[serde(rename = "sdpMLineIndex")]
+    sdp_mline_index: Option<u16>,
+    client_id: String,
+}
+
 #[wasm_bindgen]
 pub struct WebRTCClient {
     local_stream: Option<MediaStream>,
     peer_connections: Rc<RefCell<HashMap<String, RtcPeerConnection>>>,
     on_status_change: Option<js_sys::Function>,
     on_remote_stream: Option<js_sys::Function>,
+    on_ice_candidate: Option<js_sys::Function>,
 }
 
 #[wasm_bindgen]
@@ -51,6 +62,7 @@ impl WebRTCClient {
             peer_connections: Rc::new(RefCell::new(HashMap::new())),
             on_status_change: None,
             on_remote_stream: None,
+            on_ice_candidate: None,
         }
     }
 
@@ -62,6 +74,11 @@ impl WebRTCClient {
     #[wasm_bindgen(js_name = setOnRemoteStream)]
     pub fn set_on_remote_stream(&mut self, callback: js_sys::Function) {
         self.on_remote_stream = Some(callback);
+    }
+
+    #[wasm_bindgen(js_name = setOnIceCandidate)]
+    pub fn set_on_ice_candidate(&mut self, callback: js_sys::Function) {
+        self.on_ice_candidate = Some(callback);
     }
 
     fn update_status(&self, message: &str) {
@@ -186,10 +203,37 @@ impl WebRTCClient {
         pc.set_ontrack(Some(ontrack_callback.as_ref().unchecked_ref()));
         ontrack_callback.forget();
 
-        // Setup onicecandidate handler  
-        let onicecandidate_callback = Closure::wrap(Box::new(move |_event: RtcPeerConnectionIceEvent| {
-            // ICE candidates are automatically included in SDP with Trickle ICE
-            console_log!("[WebRTCClient] ICE candidate event");
+        // Setup onicecandidate handler
+        let target_id_ice = target_client_id.to_string();
+        let on_ice_callback = self.on_ice_candidate.clone();
+        let onicecandidate_callback = Closure::wrap(Box::new(move |event: RtcPeerConnectionIceEvent| {
+            if let Some(candidate) = event.candidate() {
+                console_log!("[WebRTCClient] New ICE candidate for: {}", target_id_ice);
+                if let Some(ref callback) = on_ice_callback {
+                    let candidate_str = candidate.candidate();
+                    let sdp_mid = candidate.sdp_mid();
+                    let sdp_mline_index = candidate.sdp_m_line_index();
+                    
+                    let payload = IceCandidatePayload {
+                        candidate: candidate_str,
+                        sdp_mid,
+                        sdp_mline_index,
+                        client_id: target_id_ice.clone(),
+                    };
+                    
+                    if let Ok(payload_json) = serde_json::to_value(&payload) {
+                        let message = Message {
+                            msg_type: "ice-candidate".to_string(),
+                            payload: payload_json,
+                        };
+                        if let Ok(json) = serde_json::to_string(&message) {
+                            let _ = callback.call1(&JsValue::NULL, &JsValue::from_str(&json));
+                        }
+                    }
+                }
+            } else {
+                console_log!("[WebRTCClient] ICE gathering complete for: {}", target_id_ice);
+            }
         }) as Box<dyn FnMut(_)>);
         
         pc.set_onicecandidate(Some(onicecandidate_callback.as_ref().unchecked_ref()));
@@ -310,6 +354,27 @@ impl WebRTCClient {
             remote_desc.set_sdp(&sdp);
             JsFuture::from(pc.set_remote_description(&remote_desc)).await?;
             console_log!("[WebRTCClient] Remote description set");
+        }
+
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = handleIceCandidate)]
+    pub async fn handle_ice_candidate(&self, sender_id: String, candidate: String, sdp_mid: Option<String>, sdp_mline_index: Option<u16>) -> Result<(), JsValue> {
+        console_log!("[WebRTCClient] Handling ICE candidate from: {}", sender_id);
+
+        if let Some(pc) = self.peer_connections.borrow().get(&sender_id) {
+            let mut candidate_init = web_sys::RtcIceCandidateInit::new(&candidate);
+            if let Some(mid) = sdp_mid {
+                candidate_init.sdp_mid(Some(&mid));
+            }
+            if let Some(index) = sdp_mline_index {
+                candidate_init.sdp_m_line_index(Some(index));
+            }
+            
+            let ice_candidate = web_sys::RtcIceCandidate::new(&candidate_init)?;
+            JsFuture::from(pc.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&ice_candidate))).await?;
+            console_log!("[WebRTCClient] ICE candidate added");
         }
 
         Ok(())

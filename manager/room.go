@@ -189,3 +189,36 @@ func (rm *RoomManager) TransferSDPAnswer(senderClient *model.Client, sdp *model.
 
 	return nil
 }
+
+// TransferIceCandidate transfers an ICE candidate from one client to another
+func (rm *RoomManager) TransferIceCandidate(senderClient *model.Client, iceCandidate *model.IceCandidate, targetClientID string) error {
+	room, err := rm.roomRepo.GetByClientID(senderClient.ID)
+	if err != nil {
+		return err
+	}
+
+	targetClient, ok := room.Clients[targetClientID]
+	if !ok {
+		log.Printf("Target client %s not found in room", targetClientID)
+		return nil
+	}
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"client_id":      senderClient.ID,
+		"candidate":      iceCandidate.Candidate,
+		"sdpMid":         iceCandidate.SdpMid,
+		"sdpMLineIndex":  iceCandidate.SdpMLineIndex,
+	})
+	msg := &model.Message{
+		Type:    model.MessageTypeIceCandidate,
+		Payload: payload,
+	}
+
+	select {
+	case targetClient.Send <- msg:
+	default:
+		log.Printf("Failed to send ICE candidate to %s", targetClientID)
+	}
+
+	return nil
+}
