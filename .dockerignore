@@ -1,0 +1,35 @@
+# Go files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test files
+*.test
+*.out
+
+# Dependency directories
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# WASM build artifacts (keep source)
+webrtc-wasm/pkg/
+webrtc-wasm/target/
+
+# Build output
+*.exe
+gosignaling.exe

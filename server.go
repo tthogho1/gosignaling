@@ -18,6 +18,11 @@ func serve(addr string) error {
 		h.CreateConnection(w, r)
 	})
 
+	// Add /ws endpoint as alias for /connect
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		h.CreateConnection(w, r)
+	})
+
 	log.Printf("WebRTC signaling server listening on %s", addr)
 	return http.ListenAndServe(addr, nil)
 }
