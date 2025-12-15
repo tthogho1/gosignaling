@@ -34,3 +34,23 @@ type IceCandidate struct {
 	SdpMLineIndex  *uint16 `json:"sdpMLineIndex,omitempty"`
 	ClientID       string  `json:"client_id"`
 }
+
+// RedisMessageType defines the type of Redis Pub/Sub message for clustering
+type RedisMessageType string
+
+const (
+	RedisMessageTypeSDPOffer      RedisMessageType = "webrtc:offer"
+	RedisMessageTypeSDPAnswer     RedisMessageType = "webrtc:answer"
+	RedisMessageTypeIceCandidate  RedisMessageType = "webrtc:ice"
+	RedisMessageTypeNewClient     RedisMessageType = "webrtc:new_client"
+	RedisMessageTypeLeaveClient   RedisMessageType = "webrtc:leave_client"
+)
+
+// RedisMessage represents a message sent through Redis Pub/Sub
+type RedisMessage struct {
+	Type           RedisMessageType `json:"type"`
+	SenderClientID string           `json:"sender_client_id"`
+	TargetClientID string           `json:"target_client_id"`
+	RoomID         string           `json:"room_id,omitempty"`
+	Payload        json.RawMessage  `json:"payload"`
+}

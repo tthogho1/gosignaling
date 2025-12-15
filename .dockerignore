@@ -1,3 +1,11 @@
+# Git files
+.git
+.gitignore
+
+# Environment files
+.env
+.env.local
+
 # Go files
 *.exe
 *.exe~
@@ -12,13 +20,29 @@
 # Dependency directories
 vendor/
 
-# IDE
+# Documentation
+*.md
+README.md
+WASM_BUILD_SUCCESS.md
+
+# Scripts
+*.ps1
+build-wasm.ps1
+
+# WASM build artifacts (not needed for Go server)
+webrtc-wasm/pkg/
+webrtc-wasm/target/
+webrtc-wasm/src
+webrtc-wasm/Cargo.toml
+
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
@@ -26,10 +50,13 @@ Thumbs.db
 *.log
 logs/
 
-# WASM build artifacts (keep source)
-webrtc-wasm/pkg/
-webrtc-wasm/target/
-
 # Build output
-*.exe
+gosignaling
 gosignaling.exe
+
+# Backup files
+*.backup
+main.go.backup
+
+# Node modules (if any)
+node_modules

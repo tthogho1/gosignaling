@@ -4,6 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
+
+	"gosignaling/config"
 )
 
 func main() {
@@ -19,7 +23,19 @@ func run() error {
 	)
 	flag.Parse()
 
-	addr := fmt.Sprintf("%s:%d", *addrFlag, *portFlag)
+	// Initialize environment variables and Redis
+	config.InitEnv()
+	config.InitRedis()
+
+	// Fly.ioのPORT環境変数を優先的に使用
+	port := *portFlag
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		if p, err := strconv.Atoi(envPort); err == nil {
+			port = p
+		}
+	}
+
+	addr := fmt.Sprintf("%s:%d", *addrFlag, port)
 	log.Printf("Starting WebRTC signaling server on %s", addr)
 
 	return serve(addr)

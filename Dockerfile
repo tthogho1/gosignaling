@@ -1,41 +1,55 @@
-# Dockerfile for gosignaling server
+# Dockerfile for gosignaling server (Fly.io optimized with alpine)
 
+# Build stage
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates tzdata
 
-# Copy go.mod and go.sum
+# Copy go.mod and go.sum first for better caching
 COPY go.mod go.sum ./
 
 # Download dependencies
-RUN go mod download
+RUN go mod download && go mod verify
 
 # Copy source code
 COPY . .
 
-# Build Go binary (build entire package, not just main.go)
-RUN CGO_ENABLED=0 GOOS=linux go build -o gosignaling .
+# Build Go binary with optimizations
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s" -a -installsuffix cgo -o gosignaling .
 
 # Final runtime image
 FROM alpine:latest
 
-WORKDIR /app
+# Install runtime dependencies and create non-root user
+RUN apk --no-cache add ca-certificates tzdata wget && \
+    addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
 
-# Install ca-certificates
-RUN apk --no-cache add ca-certificates
+WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/gosignaling .
 
-# Copy static HTML files if they exist
+# Copy static HTML files
 COPY --from=builder /app/client.html ./client.html
 COPY --from=builder /app/rustwasm.html ./rustwasm.html
 
-# Expose port (default 8080)
+# Change ownership
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose port
 EXPOSE 8080
+
+# Health check (optional but recommended for Fly.io)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Run the server
 CMD ["./gosignaling"]

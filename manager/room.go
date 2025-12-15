@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"gosignaling/config"
 	"gosignaling/model"
 	"gosignaling/repository"
 )
@@ -128,6 +129,26 @@ func (rm *RoomManager) notifyLeaveClient(roomID string, leavingClient *model.Cli
 	return nil
 }
 
+// GetClientByID returns a client by ID (for clustering service)
+func (rm *RoomManager) GetClientByID(clientID string) (*model.Client, error) {
+	room, err := rm.roomRepo.GetByClientID(clientID)
+	if err != nil {
+		return nil, err
+	}
+
+	client, ok := room.Clients[clientID]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+
+	return client, nil
+}
+
+// GetRoomByClientID returns a room containing the specified client (for clustering service)
+func (rm *RoomManager) GetRoomByClientID(clientID string) (*model.Room, error) {
+	return rm.roomRepo.GetByClientID(clientID)
+}
+
 // TransferSDPOffer transfers an SDP offer from one client to another
 func (rm *RoomManager) TransferSDPOffer(senderClient *model.Client, sdp *model.SDP, targetClientID string) error {
 	room, err := rm.roomRepo.GetByClientID(senderClient.ID)
@@ -137,10 +158,12 @@ func (rm *RoomManager) TransferSDPOffer(senderClient *model.Client, sdp *model.S
 
 	targetClient, ok := room.Clients[targetClientID]
 	if !ok {
-		log.Printf("Target client %s not found in room", targetClientID)
-		return nil
+		// Target client not in local room, publish to Redis for other pods
+		log.Printf("Target client %s not found locally, publishing to Redis", targetClientID)
+		return rm.publishSDPOfferToRedis(senderClient.ID, targetClientID, sdp)
 	}
 
+	// Target client is on this pod, send directly
 	payload, _ := json.Marshal(map[string]string{
 		"client_id": senderClient.ID,
 		"sdp":       sdp.SDP,
@@ -152,6 +175,7 @@ func (rm *RoomManager) TransferSDPOffer(senderClient *model.Client, sdp *model.S
 
 	select {
 	case targetClient.Send <- msg:
+		log.Printf("📤 Sent SDP offer locally to %s", targetClientID)
 	default:
 		log.Printf("Failed to send SDP offer to %s", targetClientID)
 	}
@@ -168,10 +192,12 @@ func (rm *RoomManager) TransferSDPAnswer(senderClient *model.Client, sdp *model.
 
 	targetClient, ok := room.Clients[targetClientID]
 	if !ok {
-		log.Printf("Target client %s not found in room", targetClientID)
-		return nil
+		// Target client not in local room, publish to Redis for other pods
+		log.Printf("Target client %s not found locally, publishing to Redis", targetClientID)
+		return rm.publishSDPAnswerToRedis(senderClient.ID, targetClientID, sdp)
 	}
 
+	// Target client is on this pod, send directly
 	payload, _ := json.Marshal(map[string]string{
 		"client_id": senderClient.ID,
 		"sdp":       sdp.SDP,
@@ -183,6 +209,7 @@ func (rm *RoomManager) TransferSDPAnswer(senderClient *model.Client, sdp *model.
 
 	select {
 	case targetClient.Send <- msg:
+		log.Printf("📤 Sent SDP answer locally to %s", targetClientID)
 	default:
 		log.Printf("Failed to send SDP answer to %s", targetClientID)
 	}
@@ -199,10 +226,12 @@ func (rm *RoomManager) TransferIceCandidate(senderClient *model.Client, iceCandi
 
 	targetClient, ok := room.Clients[targetClientID]
 	if !ok {
-		log.Printf("Target client %s not found in room", targetClientID)
-		return nil
+		// Target client not in local room, publish to Redis for other pods
+		log.Printf("Target client %s not found locally, publishing to Redis", targetClientID)
+		return rm.publishIceCandidateToRedis(senderClient.ID, targetClientID, iceCandidate)
 	}
 
+	// Target client is on this pod, send directly
 	payload, _ := json.Marshal(map[string]interface{}{
 		"client_id":      senderClient.ID,
 		"candidate":      iceCandidate.Candidate,
@@ -216,9 +245,65 @@ func (rm *RoomManager) TransferIceCandidate(senderClient *model.Client, iceCandi
 
 	select {
 	case targetClient.Send <- msg:
+		log.Printf("📤 Sent ICE candidate locally to %s", targetClientID)
 	default:
 		log.Printf("Failed to send ICE candidate to %s", targetClientID)
 	}
 
 	return nil
+}
+
+// Redis Pub/Sub helper methods
+
+func (rm *RoomManager) publishSDPOfferToRedis(senderClientID, targetClientID string, sdp *model.SDP) error {
+	payload, _ := json.Marshal(map[string]string{
+		"client_id": senderClientID,
+		"sdp":       sdp.SDP,
+	})
+
+	redisMsg := &model.RedisMessage{
+		Type:           model.RedisMessageTypeSDPOffer,
+		SenderClientID: senderClientID,
+		TargetClientID: targetClientID,
+		Payload:        payload,
+	}
+
+	msgBytes, _ := json.Marshal(redisMsg)
+	return config.Rdb.Publish(config.Ctx, string(model.RedisMessageTypeSDPOffer), msgBytes).Err()
+}
+
+func (rm *RoomManager) publishSDPAnswerToRedis(senderClientID, targetClientID string, sdp *model.SDP) error {
+	payload, _ := json.Marshal(map[string]string{
+		"client_id": senderClientID,
+		"sdp":       sdp.SDP,
+	})
+
+	redisMsg := &model.RedisMessage{
+		Type:           model.RedisMessageTypeSDPAnswer,
+		SenderClientID: senderClientID,
+		TargetClientID: targetClientID,
+		Payload:        payload,
+	}
+
+	msgBytes, _ := json.Marshal(redisMsg)
+	return config.Rdb.Publish(config.Ctx, string(model.RedisMessageTypeSDPAnswer), msgBytes).Err()
+}
+
+func (rm *RoomManager) publishIceCandidateToRedis(senderClientID, targetClientID string, iceCandidate *model.IceCandidate) error {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"client_id":     senderClientID,
+		"candidate":     iceCandidate.Candidate,
+		"sdpMid":        iceCandidate.SdpMid,
+		"sdpMLineIndex": iceCandidate.SdpMLineIndex,
+	})
+
+	redisMsg := &model.RedisMessage{
+		Type:           model.RedisMessageTypeIceCandidate,
+		SenderClientID: senderClientID,
+		TargetClientID: targetClientID,
+		Payload:        payload,
+	}
+
+	msgBytes, _ := json.Marshal(redisMsg)
+	return config.Rdb.Publish(config.Ctx, string(model.RedisMessageTypeIceCandidate), msgBytes).Err()
 }
