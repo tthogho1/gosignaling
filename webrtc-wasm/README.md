@@ -1,80 +1,80 @@
 # WebRTC WASM Client
 
-Rust WebAssembly で実装された WebRTC クライアント
+A WebRTC client implemented in Rust WebAssembly
 
-## 必要なツール
+## Required Tools
 
 ```powershell
-# Rust のインストール (まだの場合)
-# https://rustup.rs/ からインストール
+# Install Rust (if not already installed)
+# Install from https://rustup.rs/
 
-# wasm-pack のインストール
+# Install wasm-pack
 cargo install wasm-pack
 
-# または
+# Or
 npm install -g wasm-pack
 ```
 
-## ビルド方法
+## Build Instructions
 
 ```powershell
 cd webrtc-wasm
 wasm-pack build --target web
 ```
 
-これにより `pkg/` ディレクトリに以下のファイルが生成されます:
+This will generate the following files in the `pkg/` directory:
 
-- `webrtc_wasm.js` - JavaScript バインディング
-- `webrtc_wasm_bg.wasm` - WebAssembly バイナリ
-- `webrtc_wasm.d.ts` - TypeScript 型定義
+- `webrtc_wasm.js` - JavaScript bindings
+- `webrtc_wasm_bg.wasm` - WebAssembly binary
+- `webrtc_wasm.d.ts` - TypeScript type definitions
 
-## 使用方法
+## Usage
 
-1. WASM モジュールをビルド:
+1. Build the WASM module:
 
 ```powershell
 cd webrtc-wasm
 wasm-pack build --target web
 ```
 
-2. HTTP サーバーを起動 (WASM は file://プロトコルでは動作しません):
+2. Start an HTTP server (WASM does not work with the file:// protocol):
 
 ```powershell
-# Pythonの場合
+# For Python
 python -m http.server 8080
 
-# または Node.jsの場合
+# Or for Node.js
 npx http-server -p 8080
 ```
 
-3. ブラウザで `http://localhost:8080/rustwasm.html` を開く
+3. Open `http://localhost:8080/rustwasm.html` in your browser
 
-## 実装されている機能
+## Implemented Features
 
-### Rust (WASM) 側
+### Rust (WASM) Side
 
-- ✅ WebRTC PeerConnection 管理
-- ✅ メディアストリーム取得
-- ✅ SDP Offer/Answer 生成
-- ✅ ICE 候補収集
-- ✅ リモートストリームの受信
-- ✅ STUN/TURN サーバー設定
-- ✅ Trickle ICE サポート
+- ✅ WebRTC PeerConnection management
+- ✅ Media stream acquisition
+- ✅ SDP Offer/Answer generation
+- ✅ ICE candidate collection
+- ✅ Remote stream reception
+- ✅ STUN/TURN server configuration
+- ✅ Trickle ICE support
 
-### JavaScript 側
+### JavaScript Side
 
-- ✅ WebSocket 通信
-- ✅ シグナリングメッセージのルーティング
-- ✅ UI 制御
-- ✅ ビデオ要素の管理
+- ✅ WebSocket communication
+- ✅ Signaling message routing
+- ✅ UI control
+- ✅ Video element management
 
-## アーキテクチャ
+## Architecture
 
 ```
 ┌─────────────────────────────────────────┐
 │         rustwasm.html (UI)              │
-│  - WebSocket通信                         │
-│  - ビデオ要素管理                        │
+│  - WebSocket communication              │
+│  - Video element management             │
 └────────────┬────────────────────────────┘
              │
              │ JavaScript Bridge
@@ -82,59 +82,59 @@ npx http-server -p 8080
 ┌─────────────────────────────────────────┐
 │   webrtc-wasm (Rust/WASM)               │
 │  - WebRTC PeerConnection                │
-│  - メディアストリーム処理                 │
-│  - SDP交換ロジック                       │
+│  - Media stream processing              │
+│  - SDP exchange logic                   │
 └─────────────────────────────────────────┘
 ```
 
-## パフォーマンス
+## Performance
 
-- **初期ロード**: WebAssembly のロードにわずかなオーバーヘッド
-- **実行速度**: ネイティブに近いパフォーマンス
-- **バイナリサイズ**: 最適化ビルドで約 100-200KB
+- **Initial Load**: Slight overhead for loading WebAssembly
+- **Execution Speed**: Near-native performance
+- **Binary Size**: Approximately 100-200KB with optimized build
 
-## 開発
+## Development
 
-### デバッグビルド
+### Debug Build
 
 ```powershell
 wasm-pack build --target web --dev
 ```
 
-### リリースビルド (最適化)
+### Release Build (Optimized)
 
 ```powershell
 wasm-pack build --target web --release
 ```
 
-### サイズ最適化
+### Size Optimization
 
 ```powershell
-# wasm-optを使用してさらに最適化
+# Further optimize using wasm-opt
 wasm-opt pkg/webrtc_wasm_bg.wasm -O3 -o pkg/webrtc_wasm_bg.wasm
 ```
 
-## トラブルシューティング
+## Troubleshooting
 
-### CORS エラー
+### CORS Error
 
-WASM ファイルは HTTP サーバー経由で提供する必要があります。
+WASM files must be served via an HTTP server.
 
-### ビルドエラー
+### Build Error
 
 ```powershell
-# 依存関係を更新
+# Update dependencies
 cargo update
 
-# クリーンビルド
+# Clean build
 cargo clean
 wasm-pack build --target web
 ```
 
-## 今後の改善案
+## Future Improvements
 
-1. **完全な WebSocket 統合** - WebSocket も Rust 側で管理
-2. **データチャネル** - ファイル転送などのサポート
-3. **録画機能** - MediaRecorder API の統合
-4. **画面共有** - getDisplayMedia API のサポート
-5. **統計情報** - WebRTC 統計の取得と表示
+1. **Complete WebSocket Integration** - Manage WebSocket on the Rust side
+2. **Data Channels** - Support for file transfers, etc.
+3. **Recording Feature** - MediaRecorder API integration
+4. **Screen Sharing** - getDisplayMedia API support
+5. **Statistics** - WebRTC statistics retrieval and display

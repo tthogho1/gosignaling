@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -54,21 +54,21 @@
   <h1>WebRTC Signaling Test Client</h1>
 
   <div class="container">
-    <h2>接続設定</h2>
+    <h2>Connection Settings</h2>
     <label>
       Room ID: <input type="text" id="roomId" value="test-room" />
     </label>
-    <button id="joinBtn">ルームに参加</button>
-    <button id="leaveBtn" disabled>退出</button>
+    <button id="joinBtn">Join Room</button>
+    <button id="leaveBtn" disabled>Leave</button>
   </div>
 
-  <div class="status" id="status">未接続</div>
+  <div class="status" id="status">Not connected</div>
 
   <div class="container">
-    <h2>ビデオ</h2>
+    <h2>Video</h2>
     <div class="videos">
       <div>
-        <h3>自分</h3>
+        <h3>Local</h3>
         <video id="localVideo" autoplay muted playsinline></video>
       </div>
       <div id="remoteVideos"></div>
@@ -94,14 +94,14 @@
 
     const rtcConfig = {
       iceServers: [
-        // STUNサーバー（NAT越えのためのパブリックIPアドレス検出）
+        // STUN servers (for public IP address detection for NAT traversal)
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
-        // TURNサーバー（厳しいファイアウォール環境用）
-        // OpenRelayの無料パブリックTURNサーバー
+        // TURN servers (for strict firewall environments)
+        // OpenRelay free public TURN server
         {
           urls: 'turn:openrelay.metered.ca:80',
           username: 'openrelayproject',
@@ -118,11 +118,11 @@
           credential: 'openrelayproject'
         }
       ],
-      // ICE候補の収集戦略（all = すべての候補を収集）
+      // ICE candidate gathering strategy (all = gather all candidates)
       iceTransportPolicy: 'all',
-      // バンドルポリシー（max-bundle = 帯域幅を最適化）
+      // Bundle policy (max-bundle = optimize bandwidth)
       bundlePolicy: 'max-bundle',
-      // RTCP多重化（必須 = 接続を効率化）
+      // RTCP multiplexing (require = optimize connection)
       rtcpMuxPolicy: 'require'
     };
 
@@ -138,9 +138,9 @@
           audio: true
         });
         localVideo.srcObject = localStream;
-        updateStatus('カメラとマイクを取得しました');
+        updateStatus('Camera and microphone acquired');
       } catch (error) {
-        updateStatus('メディアデバイスの取得に失敗: ' + error.message);
+        updateStatus('Failed to get media devices: ' + error.message);
         throw error;
       }
     }
@@ -148,18 +148,18 @@
     function createPeerConnection(targetClientId) {
       const pc = new RTCPeerConnection(rtcConfig);
 
-      // ローカルストリームのトラックを追加
+      // Add local stream tracks
       localStream.getTracks().forEach(track => {
         pc.addTrack(track, localStream);
       });
 
-      // リモートストリームを受信
+      // Receive remote stream
       pc.ontrack = (event) => {
-        updateStatus(`${targetClientId} からストリームを受信`);
+        updateStatus(`Received stream from ${targetClientId}`);
         addRemoteVideo(targetClientId, event.streams[0]);
       };
 
-      // ICE候補の収集完了時
+      // When ICE candidate gathering is complete
       pc.onicecandidate = (event) => {
         if (!event.candidate) {
           console.log('ICE gathering complete for', targetClientId);
@@ -167,7 +167,7 @@
       };
 
       pc.onconnectionstatechange = () => {
-        updateStatus(`${targetClientId} の接続状態: ${pc.connectionState}`);
+        updateStatus(`${targetClientId} connection state: ${pc.connectionState}`);
       };
 
       peerConnections.set(targetClientId, pc);
@@ -235,19 +235,19 @@
     }
 
     async function handleNewClient(newClientId) {
-      updateStatus(`新しいクライアントが参加: ${newClientId}`);
+      updateStatus(`New client joined: ${newClientId}`);
       console.log('[handleNewClient] Starting for client:', newClientId);
 
       const pc = createPeerConnection(newClientId);
 
-      // Offerを作成
+      // Create Offer
       console.log('[handleNewClient] Creating offer...');
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       console.log('[handleNewClient] Offer created');
 
-      // ICE候補の収集を待たずにすぐ送信（Trickle ICE）
-      // これにより接続確立が高速化されます
+      // Send immediately without waiting for ICE candidate gathering (Trickle ICE)
+      // This speeds up connection establishment
       console.log('[handleNewClient] Sending offer immediately to:', newClientId);
       sendMessage({
         type: 'offer',
@@ -260,7 +260,7 @@
     }
 
     async function handleOffer(senderId, sdp) {
-      updateStatus(`${senderId} からOfferを受信`);
+      updateStatus(`Received Offer from ${senderId}`);
       console.log('[handleOffer] Received offer from:', senderId);
       console.log('[handleOffer] SDP:', sdp.substring(0, 100) + '...');
 
@@ -277,7 +277,7 @@
       await pc.setLocalDescription(answer);
       console.log('[handleOffer] Answer created');
 
-      // ICE候補の収集を待たずにすぐ送信（Trickle ICE）
+      // Send immediately without waiting for ICE candidate gathering (Trickle ICE)
       console.log('[handleOffer] Sending answer immediately to:', senderId);
       sendMessage({
         type: 'answer',
@@ -290,7 +290,7 @@
     }
 
     async function handleAnswer(senderId, sdp) {
-      updateStatus(`${senderId} からAnswerを受信`);
+      updateStatus(`Received Answer from ${senderId}`);
       console.log('[handleAnswer] Received answer from:', senderId);
       console.log('[handleAnswer] SDP:', sdp.substring(0, 100) + '...');
 
@@ -308,7 +308,7 @@
     }
 
     function handleLeaveClient(leavingClientId) {
-      updateStatus(`${leavingClientId} が退出しました`);
+      updateStatus(`${leavingClientId} has left`);
 
       const pc = peerConnections.get(leavingClientId);
       if (pc) {
@@ -364,7 +364,7 @@
         ws = new WebSocket(WS_URL);
 
         ws.onopen = () => {
-          updateStatus('WebSocket接続成功');
+          updateStatus('WebSocket connection successful');
         };
 
         ws.onmessage = async (event) => {
@@ -373,14 +373,14 @@
 
           switch (message.type) {
             case 'notify-client-id':
-              // payloadは既にオブジェクトの場合と文字列の場合があるので確認
+              // Check if payload is already an object or a string
               const payload = typeof message.payload === 'string'
                 ? JSON.parse(message.payload)
                 : message.payload;
               clientId = payload.client_id;
-              updateStatus(`クライアントID: ${clientId}`);
+              updateStatus(`Client ID: ${clientId}`);
 
-              // ルームに参加
+              // Join room
               sendMessage({
                 type: 'join',
                 payload: { room_id: roomIdInput.value }
@@ -476,7 +476,7 @@
               break;
 
             case 'ping':
-              // Ping応答は不要
+              // No ping response needed
               break;
 
             default:
@@ -485,11 +485,11 @@
         };
 
         ws.onerror = (error) => {
-          updateStatus('WebSocketエラー: ' + error);
+          updateStatus('WebSocket error: ' + error);
         };
 
         ws.onclose = () => {
-          updateStatus('WebSocket接続が切断されました');
+          updateStatus('WebSocket connection closed');
           joinBtn.disabled = false;
           leaveBtn.disabled = true;
         };
@@ -498,7 +498,7 @@
         leaveBtn.disabled = false;
 
       } catch (error) {
-        updateStatus('エラー: ' + error.message);
+        updateStatus('Error: ' + error.message);
         console.error(error);
       }
     }
@@ -524,7 +524,7 @@
       localVideo.srcObject = null;
       remoteVideos.innerHTML = '';
 
-      updateStatus('退出しました');
+      updateStatus('Left room');
       joinBtn.disabled = false;
       leaveBtn.disabled = true;
     }

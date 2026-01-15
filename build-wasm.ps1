@@ -1,17 +1,17 @@
-# WebRTC WASM ビルドスクリプト
+# WebRTC WASM Build Script
 
 Write-Host "Building WebRTC WASM module..." -ForegroundColor Green
 
-# webrtc-wasmディレクトリに移動
+# Change to webrtc-wasm directory
 Set-Location -Path (Join-Path $PSScriptRoot "webrtc-wasm")
 
-# wasm-packがインストールされているか確認
+# Check if wasm-pack is installed
 if (!(Get-Command wasm-pack -ErrorAction SilentlyContinue)) {
     Write-Host "wasm-pack not found. Installing..." -ForegroundColor Yellow
     cargo install wasm-pack
 }
 
-# ビルド
+# Build
 Write-Host "Running wasm-pack build..." -ForegroundColor Cyan
 wasm-pack build --target web --release
 
@@ -26,5 +26,5 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
-# 元のディレクトリに戻る
+# Return to original directory
 Set-Location -Path $PSScriptRoot

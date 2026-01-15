@@ -1,77 +1,77 @@
 # WebRTC Signaling Server (Go)
 
-Go 言語で実装された WebRTC シグナリングサーバです。[singo](https://github.com/tockn/singo)ライブラリを参考に実装されています。
+A WebRTC signaling server implemented in Go. This implementation is based on the [singo](https://github.com/tockn/singo) library.
 
-## 機能
+## Features
 
-- **ルーム管理**: クライアントが接続時にルームを作成し、同じルーム内のユーザ間でプロトコル交換を行います
-- **自動リソース管理**: ルームから全ユーザが退出した時に、自動的にルームのリソースを削除します
-- **WebSocket ベース**: WebSocket を使用した双方向通信
-- **フルメッシュ P2P**: 複数ユーザ間でのフルメッシュ P2P 通信をサポート
+- **Room Management**: Creates rooms when clients connect, enabling protocol exchange between users in the same room
+- **Automatic Resource Management**: Automatically deletes room resources when all users leave
+- **WebSocket Based**: Bidirectional communication using WebSocket
+- **Full Mesh P2P**: Supports full mesh P2P communication between multiple users
 
-## アーキテクチャ
+## Architecture
 
 ```
 gosignaling/
-├── main.go              # エントリーポイント
-├── server.go            # HTTPサーバ設定
+├── main.go              # Entry point
+├── server.go            # HTTP server configuration
 ├── handler/
-│   └── handler.go       # WebSocket接続とメッセージハンドリング
+│   └── handler.go       # WebSocket connection and message handling
 ├── manager/
-│   └── room.go          # ルーム管理ロジック
+│   └── room.go          # Room management logic
 ├── model/
-│   ├── room.go          # ルームとクライアントのモデル
-│   └── message.go       # メッセージ型定義
+│   ├── room.go          # Room and client models
+│   └── message.go       # Message type definitions
 └── repository/
-    ├── room.go          # リポジトリインターフェース
+    ├── room.go          # Repository interface
     └── mem/
-        └── room.go      # インメモリリポジトリ実装
+        └── room.go      # In-memory repository implementation
 ```
 
-## インストール
+## Installation
 
-### 前提条件
+### Prerequisites
 
-- Go 1.21 以上
+- Go 1.21 or higher
 
-### セットアップ
+### Setup
 
 ```bash
-# リポジトリをクローン（または作成）
+# Clone repository (or create)
 cd gosignaling
 
-# 依存関係をインストール
+# Install dependencies
 go mod download
 ```
 
-## 使い方
+## Usage
 
-### サーバの起動
+### Starting the Server
 
 ```bash
-# デフォルト設定で起動（0.0.0.0:5000）
+# Start with default settings (0.0.0.0:5000)
 go run .
 
-# カスタムアドレスとポートで起動
+# Start with custom address and port
 go run . -addr 127.0.0.1 -port 8080
 ```
 
-### コマンドラインオプション
+### Command Line Options
 
-- `-addr`: サーバのアドレス（デフォルト: `0.0.0.0`）
-- `-port`: サーバのポート（デフォルト: `5000`）
+- `-addr`: Server address (default: `0.0.0.0`)
+- `-port`: Server port (default: `5000`)
 
-### ビルド
+### Build
 
 ```bash
-# 実行ファイルをビルド
+# Build executable
 go build -o signaling-server
 
-# 実行
+# Run
 ./signaling-server
 ```
 
-Windows の場合:
+For Windows:
 
 ```powershell
 go build -o signaling-server.exe
@@ -80,15 +80,15 @@ go build -o signaling-server.exe
 
 ## WebSocket API
 
-### エンドポイント
+### Endpoint
 
-- `ws://localhost:5000/connect` - WebSocket 接続エンドポイント
+- `ws://localhost:5000/connect` - WebSocket connection endpoint
 
-### メッセージタイプ
+### Message Types
 
-#### クライアント → サーバ
+#### Client → Server
 
-**1. ルームに参加**
+**1. Join Room**
 
 ```json
 {
@@ -99,7 +99,7 @@ go build -o signaling-server.exe
 }
 ```
 
-**2. SDP Offer を送信**
+**2. Send SDP Offer**
 
 ```json
 {
@@ -111,7 +111,7 @@ go build -o signaling-server.exe
 }
 ```
 
-**3. SDP Answer を送信**
+**3. Send SDP Answer**
 
 ```json
 {
@@ -123,9 +123,9 @@ go build -o signaling-server.exe
 }
 ```
 
-#### サーバ → クライアント
+#### Server → Client
 
-**1. クライアント ID 通知**
+**1. Client ID Notification**
 
 ```json
 {
@@ -136,7 +136,7 @@ go build -o signaling-server.exe
 }
 ```
 
-**2. 新規クライアント通知**
+**2. New Client Notification**
 
 ```json
 {
@@ -147,7 +147,7 @@ go build -o signaling-server.exe
 }
 ```
 
-**3. クライアント退出通知**
+**3. Client Leave Notification**
 
 ```json
 {
@@ -158,7 +158,7 @@ go build -o signaling-server.exe
 }
 ```
 
-**4. SDP Offer 受信**
+**4. Receive SDP Offer**
 
 ```json
 {
@@ -170,7 +170,7 @@ go build -o signaling-server.exe
 }
 ```
 
-**5. SDP Answer 受信**
+**5. Receive SDP Answer**
 
 ```json
 {
@@ -182,40 +182,40 @@ go build -o signaling-server.exe
 }
 ```
 
-## 処理フロー
+## Processing Flow
 
-1. **接続確立**
+1. **Connection Establishment**
 
-   - クライアントが WebSocket で `/connect` に接続
-   - サーバが一意のクライアント ID を生成して通知
+   - Client connects to `/connect` via WebSocket
+   - Server generates and notifies a unique client ID
 
-2. **ルーム参加**
+2. **Room Join**
 
-   - クライアントが `join` メッセージを送信
-   - ルームが存在しない場合は自動作成
-   - 既存のクライアントに新規参加を通知
+   - Client sends `join` message
+   - Room is automatically created if it doesn't exist
+   - Existing clients are notified of new participant
 
-3. **WebRTC 接続確立**
+3. **WebRTC Connection Establishment**
 
-   - 新規参加者が Offer を作成して既存クライアントに送信
-   - 既存クライアントが Answer を返信
-   - ICE 候補交換（SDP に含まれる）
+   - New participant creates Offer and sends to existing clients
+   - Existing clients reply with Answer
+   - ICE candidate exchange (included in SDP)
 
-4. **ルーム退出**
-   - クライアント切断時に自動的にルームから削除
-   - 他のクライアントに退出を通知
-   - ルームが空になった場合、自動的にリソースを削除
+4. **Room Leave**
+   - Client is automatically removed from room on disconnect
+   - Other clients are notified of the departure
+   - Resources are automatically deleted when room becomes empty
 
-## 技術スタック
+## Tech Stack
 
-- **Go**: プログラミング言語
-- **gorilla/websocket**: WebSocket 実装
-- **rs/xid**: 一意な ID 生成
+- **Go**: Programming language
+- **gorilla/websocket**: WebSocket implementation
+- **rs/xid**: Unique ID generation
 
-## ライセンス
+## License
 
 MIT License
 
-## 参考
+## Reference
 
-このプロジェクトは [tockn/singo](https://github.com/tockn/singo) を参考に実装されています。
+This project is implemented based on [tockn/singo](https://github.com/tockn/singo).

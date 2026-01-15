@@ -27,7 +27,7 @@ func run() error {
 	config.InitEnv()
 	config.InitRedis()
 
-	// Fly.ioのPORT環境変数を優先的に使用
+	// Prioritize Fly.io PORT environment variable
 	port := *portFlag
 	if envPort := os.Getenv("PORT"); envPort != "" {
 		if p, err := strconv.Atoi(envPort); err == nil {

@@ -1,103 +1,103 @@
-# ✅ Rust WebAssembly WebRTC クライアント - ビルド完了！
+# ✅ Rust WebAssembly WebRTC Client - Build Complete!
 
-WebRTC 接続機能を Rust WebAssembly で実装しました。
+Implemented WebRTC connection functionality using Rust WebAssembly.
 
-## 📦 生成されたファイル
+## 📦 Generated Files
 
-`webrtc-wasm/pkg/` ディレクトリに以下が生成されました:
+The following files were generated in the `webrtc-wasm/pkg/` directory:
 
-- `webrtc_wasm.js` - JavaScript バインディング
-- `webrtc_wasm_bg.wasm` - WebAssembly バイナリ
-- `webrtc_wasm.d.ts` - TypeScript 型定義
+- `webrtc_wasm.js` - JavaScript bindings
+- `webrtc_wasm_bg.wasm` - WebAssembly binary
+- `webrtc_wasm.d.ts` - TypeScript type definitions
 
-## 🚀 使い方
+## 🚀 Usage
 
-### 1. HTTP サーバーを起動
+### 1. Start HTTP Server
 
-WASM は HTTP サーバー経由で提供する必要があります:
+WASM must be served via an HTTP server:
 
 ```powershell
-# Pythonの場合
+# For Python
 python -m http.server 8080
 
-# またはPython 3の場合
+# Or for Python 3
 python3 -m http.server 8080
 ```
 
-### 2. ブラウザでアクセス
+### 2. Access in Browser
 
 ```
 http://localhost:8080/rustwasm.html
 ```
 
-### 3. 使用方法
+### 3. How to Use
 
-1. 「ルームに参加」ボタンをクリック
-2. カメラとマイクへのアクセスを許可
-3. 別のブラウザ/タブで同じ Room ID に参加
-4. WebRTC 接続が確立され、お互いの映像・音声が表示されます
+1. Click the "Join Room" button
+2. Allow access to camera and microphone
+3. Join the same Room ID from another browser/tab
+4. WebRTC connection is established and you can see each other's video/audio
 
-## ⚙️ 再ビルド方法
+## ⚙️ How to Rebuild
 
-コードを変更した場合:
+If you modify the code:
 
 ```powershell
 cd webrtc-wasm
 wasm-pack build --target web --release
 ```
 
-## 📊 ビルドサイズ
+## 📊 Build Size
 
-最適化なし (現在の設定):
+Without optimization (current settings):
 
-- `webrtc_wasm_bg.wasm`: 約 400-500KB
+- `webrtc_wasm_bg.wasm`: approximately 400-500KB
 
-※ 注意: `wasm-opt`は bulk memory 操作の検証エラーのため無効化されています
+※ Note: `wasm-opt` is disabled due to bulk memory operation validation errors
 
-## 🎯 実装されている機能
+## 🎯 Implemented Features
 
-### Rust (WASM) で実装
+### Implemented in Rust (WASM)
 
-- ✅ PeerConnection 管理
-- ✅ メディアストリーム取得
-- ✅ SDP Offer/Answer 生成
-- ✅ STUN/TURN サーバー設定
-- ✅ リモートストリーム受信
+- ✅ PeerConnection management
+- ✅ Media stream acquisition
+- ✅ SDP Offer/Answer generation
+- ✅ STUN/TURN server configuration
+- ✅ Remote stream reception
 - ✅ Trickle ICE
 
-### JavaScript で実装
+### Implemented in JavaScript
 
-- ✅ WebSocket 通信
-- ✅ シグナリングメッセージルーティング
-- ✅ UI 制御
-- ✅ ビデオ要素の動的生成
+- ✅ WebSocket communication
+- ✅ Signaling message routing
+- ✅ UI control
+- ✅ Dynamic video element generation
 
-## 🔍 トラブルシューティング
+## 🔍 Troubleshooting
 
-### ページが表示されない
+### Page not displaying
 
-- HTTP サーバーが起動していることを確認
-- ブラウザのコンソールでエラーを確認
+- Verify that the HTTP server is running
+- Check for errors in the browser console
 
-### カメラ/マイクにアクセスできない
+### Cannot access camera/microphone
 
-- HTTPS または localhost からアクセスしていることを確認
-- ブラウザの権限設定を確認
+- Verify you are accessing via HTTPS or localhost
+- Check browser permission settings
 
-### 接続できない
+### Cannot connect
 
-- WebRTC シグナリングサーバーが起動していることを確認 (`go run .`)
-- ブラウザのコンソールログで接続状態を確認
+- Verify that the WebRTC signaling server is running (`go run .`)
+- Check connection status in browser console logs
 
-## 📝 警告について
+## 📝 About Warnings
 
-ビルド時の警告は問題ありません:
+Build warnings are not a problem:
 
-- `deprecated` 警告: web-sys の古い API を使用していますが動作します
-- `unused` 警告: 将来の拡張用のコードです
-- `dead_code` 警告: 未使用の構造体ですが問題ありません
+- `deprecated` warnings: Using older web-sys APIs but they still work
+- `unused` warnings: Code for future extensions
+- `dead_code` warnings: Unused structures but not problematic
 
-## 🎉 完成！
+## 🎉 Complete!
 
-Rust WebAssembly を使用した WebRTC クライアントが正常にビルドされました。
-`rustwasm.html`をブラウザで開いて試してください！
+The WebRTC client using Rust WebAssembly has been successfully built.
+Open `rustwasm.html` in your browser to try it out!
